@@ -3,12 +3,24 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Money Tracker</title>
+    <title>Money Tracker Pro</title>
     <link rel="stylesheet" href="style.css" />
+
+    <!-- Font Awesome icons -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+    />
   </head>
   <body>
     <div class="container">
-      <h1>Money Tracker App</h1>
+      <div class="top-bar">
+        <h1>Money Tracker Pro</h1>
+        <button id="themeToggleBtn" class="theme-btn" type="button">
+          <i class="fa-solid fa-moon"></i>
+          <span>Dark Mode</span>
+        </button>
+      </div>
 
       <div class="card">
         <form id="moneyForm">
@@ -34,6 +46,8 @@
               <option value="expense">Expense</option>
             </select>
 
+            <input type="date" id="dateInput" required />
+
             <button type="submit">Add</button>
           </div>
         </form>
@@ -58,6 +72,39 @@
         </div>
       </div>
 
+      <div class="summary monthly-summary">
+        <div class="summary-box">
+          <h3>This Month Income</h3>
+          <p class="income" id="monthIncomeTotal">$0.00</p>
+        </div>
+
+        <div class="summary-box">
+          <h3>This Month Expense</h3>
+          <p class="expense" id="monthExpenseTotal">$0.00</p>
+        </div>
+
+        <div class="summary-box">
+          <h3>This Month Balance</h3>
+          <p class="balance" id="monthBalanceTotal">$0.00</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="toolbar">
+          <input
+            type="text"
+            id="searchInput"
+            placeholder="Search by title..."
+          />
+
+          <select id="filterType">
+            <option value="all">All Types</option>
+            <option value="income">Income Only</option>
+            <option value="expense">Expense Only</option>
+          </select>
+        </div>
+      </div>
+
       <div class="card">
         <h2 class="section-title">Transactions</h2>
 
@@ -69,7 +116,7 @@
                 <th>Amount</th>
                 <th>Type</th>
                 <th>Date</th>
-                <th>Action</th>
+                <th>Actions</th>
               </tr>
             </thead>
 
@@ -83,6 +130,71 @@
       </div>
     </div>
 
+    <!-- PIN MODAL -->
+    <div class="modal hidden" id="pinModal">
+      <div class="modal-box small-modal">
+        <h2>Enter PIN</h2>
+        <form id="pinForm">
+          <input
+            type="password"
+            id="pinInput"
+            placeholder="Enter PIN"
+            autocomplete="off"
+          />
+          <div class="modal-actions">
+            <button type="button" id="pinCancelBtn" class="secondary-btn">
+              Cancel
+            </button>
+            <button type="submit" id="pinSubmitBtn">Submit</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- EDIT MODAL -->
+    <div class="modal hidden" id="editModal">
+      <div class="modal-box">
+        <h2>Edit Transaction</h2>
+
+        <form id="editForm">
+          <input type="hidden" id="editId" />
+
+          <div class="edit-grid">
+            <div>
+              <label for="editTitle">Title</label>
+              <input type="text" id="editTitle" required />
+            </div>
+
+            <div>
+              <label for="editAmount">Amount</label>
+              <input type="number" id="editAmount" step="0.01" required />
+            </div>
+
+            <div>
+              <label for="editType">Type</label>
+              <select id="editType" required>
+                <option value="income">Income</option>
+                <option value="expense">Expense</option>
+              </select>
+            </div>
+
+            <div>
+              <label for="editDate">Date</label>
+              <input type="date" id="editDate" required />
+            </div>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" id="editCancelBtn" class="secondary-btn">
+              Cancel
+            </button>
+            <button type="submit">Update Record</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <script type="module" src="app.js"></script>
   </body>
 </html>
+
