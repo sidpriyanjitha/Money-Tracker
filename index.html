@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Money Tracker</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="container">
+      <h1>Money Tracker App</h1>
+
+      <div class="card">
+        <form id="moneyForm">
+          <div class="form-grid">
+            <input
+              type="text"
+              id="titleInput"
+              placeholder="Enter title"
+              required
+            />
+
+            <input
+              type="number"
+              id="amountInput"
+              placeholder="Enter amount"
+              required
+              step="0.01"
+            />
+
+            <select id="typeInput" required>
+              <option value="">Select type</option>
+              <option value="income">Income</option>
+              <option value="expense">Expense</option>
+            </select>
+
+            <button type="submit">Add</button>
+          </div>
+        </form>
+
+        <div class="message" id="message"></div>
+      </div>
+
+      <div class="summary">
+        <div class="summary-box">
+          <h3>Total Income</h3>
+          <p class="income" id="incomeTotal">$0.00</p>
+        </div>
+
+        <div class="summary-box">
+          <h3>Total Expense</h3>
+          <p class="expense" id="expenseTotal">$0.00</p>
+        </div>
+
+        <div class="summary-box">
+          <h3>Balance</h3>
+          <p class="balance" id="balanceTotal">$0.00</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="section-title">Transactions</h2>
+
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Title</th>
+                <th>Amount</th>
+                <th>Type</th>
+                <th>Date</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+
+            <tbody id="transactionList">
+              <tr>
+                <td colspan="5" class="empty-text">Loading transactions...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
