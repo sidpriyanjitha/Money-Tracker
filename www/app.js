@@ -84,10 +84,10 @@ function loadTheme() {
 function updateThemeButton(isDark) {
   if (isDark) {
     themeToggleBtn.innerHTML =
-      '<i class="fa-solid fa-sun"></i><span>Light Mode</span>';
+      '<i class="fa-solid fa-sun"></i>';
   } else {
     themeToggleBtn.innerHTML =
-      '<i class="fa-solid fa-moon"></i><span>Dark Mode</span>';
+      '<i class="fa-solid fa-moon"></i>';
   }
 }
 
