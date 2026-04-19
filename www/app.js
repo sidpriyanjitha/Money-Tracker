@@ -4,16 +4,25 @@ const supabaseUrl = "https://tabgupjtduxyyrjundhj.supabase.co";
 const supabaseKey = "sb_publishable_8oP7ThVKyztLiZ_tviGpoQ_mdHn8Bvk";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// =========================
-// 2. SETTINGS
-// =========================
-const editPin = "1234";
-let selectedEditId = null;
+const validTypes = new Set(["income", "expense"]);
+const currencyFormatter = new Intl.NumberFormat("en-AU", {
+  style: "currency",
+  currency: "AUD",
+});
+
+let currentUser = null;
 let allTransactions = [];
 
-// =========================
-// 3. ELEMENTS
-// =========================
+const authCard = document.getElementById("authCard");
+const authForm = document.getElementById("authForm");
+const emailInput = document.getElementById("emailInput");
+const passwordInput = document.getElementById("passwordInput");
+const loginBtn = document.getElementById("loginBtn");
+const signupBtn = document.getElementById("signupBtn");
+const logoutBtn = document.getElementById("logoutBtn");
+const userEmail = document.getElementById("userEmail");
+const appShell = document.getElementById("appShell");
+
 const moneyForm = document.getElementById("moneyForm");
 const titleInput = document.getElementById("titleInput");
 const amountInput = document.getElementById("amountInput");
@@ -25,18 +34,14 @@ const message = document.getElementById("message");
 const incomeTotal = document.getElementById("incomeTotal");
 const expenseTotal = document.getElementById("expenseTotal");
 const balanceTotal = document.getElementById("balanceTotal");
-
 const monthIncomeTotal = document.getElementById("monthIncomeTotal");
 const monthExpenseTotal = document.getElementById("monthExpenseTotal");
 const monthBalanceTotal = document.getElementById("monthBalanceTotal");
 
 const searchInput = document.getElementById("searchInput");
 const filterType = document.getElementById("filterType");
-
-const pinModal = document.getElementById("pinModal");
-const pinForm = document.getElementById("pinForm");
-const pinInput = document.getElementById("pinInput");
-const pinCancelBtn = document.getElementById("pinCancelBtn");
+const filterMonth = document.getElementById("filterMonth");
+const clearFiltersBtn = document.getElementById("clearFiltersBtn");
 
 const editModal = document.getElementById("editModal");
 const editForm = document.getElementById("editForm");
@@ -48,27 +53,21 @@ const editDate = document.getElementById("editDate");
 const editCancelBtn = document.getElementById("editCancelBtn");
 
 const themeToggleBtn = document.getElementById("themeToggleBtn");
+const addSubmitBtn = moneyForm.querySelector("button[type='submit']");
+const editSubmitBtn = editForm.querySelector("button[type='submit']");
 
-// =========================
-// 4. DEFAULT DATE
-// =========================
-dateInput.value = new Date().toISOString().split("T")[0];
+dateInput.value = getTodayInputDate();
 
-// =========================
-// 5. MESSAGE
-// =========================
 function showMessage(text, isError = false) {
   message.textContent = text;
-  message.style.color = isError ? "red" : "green";
+  message.className = `message ${isError ? "error" : "success"}`;
 
   setTimeout(() => {
     message.textContent = "";
-  }, 3000);
+    message.className = "message";
+  }, 4000);
 }
 
-// =========================
-// 6. THEME
-// =========================
 function loadTheme() {
   const savedTheme = localStorage.getItem("money-tracker-theme");
 
@@ -84,33 +83,132 @@ function loadTheme() {
 function updateThemeButton(isDark) {
   if (isDark) {
     themeToggleBtn.innerHTML =
-      '<i class="fa-solid fa-sun"></i>';
+      '<i class="fa-solid fa-sun"></i><span class="sr-only">Toggle theme</span>';
   } else {
     themeToggleBtn.innerHTML =
-      '<i class="fa-solid fa-moon"></i>';
+      '<i class="fa-solid fa-moon"></i><span class="sr-only">Toggle theme</span>';
   }
 }
 
-themeToggleBtn.addEventListener("click", () => {
-  const isDark = document.body.classList.toggle("dark");
-  localStorage.setItem("money-tracker-theme", isDark ? "dark" : "light");
-  updateThemeButton(isDark);
-});
+function updateAuthView() {
+  const isSignedIn = Boolean(currentUser);
 
-// =========================
-// 7. MODAL HELPERS
-// =========================
-function openPinModal(id) {
-  selectedEditId = id;
-  pinInput.value = "";
-  pinModal.classList.remove("hidden");
-  pinInput.focus();
+  authCard.classList.toggle("hidden", isSignedIn);
+  appShell.classList.toggle("hidden", !isSignedIn);
+  logoutBtn.classList.toggle("hidden", !isSignedIn);
+  userEmail.classList.toggle("hidden", !isSignedIn);
+  userEmail.textContent = currentUser?.email || "";
+
+  if (!isSignedIn) {
+    allTransactions = [];
+    renderTransactions([]);
+    updateSummary([]);
+    updateMonthlySummary([]);
+  }
 }
 
-function closePinModal() {
-  pinModal.classList.add("hidden");
-  pinInput.value = "";
-  selectedEditId = null;
+async function loadSession() {
+  const { data, error } = await supabase.auth.getUser();
+
+  if (error) {
+    currentUser = null;
+    updateAuthView();
+    return;
+  }
+
+  currentUser = data.user;
+  updateAuthView();
+
+  if (currentUser) {
+    await getTransactions();
+  }
+}
+
+async function signIn() {
+  const email = emailInput.value.trim();
+  const password = passwordInput.value;
+
+  if (!email || !password) {
+    showMessage("Enter your email and password.", true);
+    return;
+  }
+
+  setAuthLoading(true, "Logging in...");
+
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      showMessage(error.message, true);
+      return;
+    }
+
+    currentUser = data.user;
+    authForm.reset();
+    updateAuthView();
+    await getTransactions();
+    showMessage("Logged in.");
+  } finally {
+    setAuthLoading(false);
+  }
+}
+
+async function signUp() {
+  const email = emailInput.value.trim();
+  const password = passwordInput.value;
+
+  if (!email || !password) {
+    showMessage("Enter an email and password to sign up.", true);
+    return;
+  }
+
+  if (password.length < 6) {
+    showMessage("Password must be at least 6 characters.", true);
+    return;
+  }
+
+  setAuthLoading(true, "Signing up...");
+
+  try {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+    });
+
+    if (error) {
+      showMessage(error.message, true);
+      return;
+    }
+
+    if (!data.session) {
+      showMessage("Check your email to confirm your account, then log in.");
+      return;
+    }
+
+    currentUser = data.user;
+    authForm.reset();
+    updateAuthView();
+    await getTransactions();
+    showMessage("Account created.");
+  } finally {
+    setAuthLoading(false);
+  }
+}
+
+async function signOut() {
+  const { error } = await supabase.auth.signOut();
+
+  if (error) {
+    showMessage(error.message, true);
+    return;
+  }
+
+  currentUser = null;
+  updateAuthView();
+  showMessage("Logged out.");
 }
 
 function openEditModal(record) {
@@ -129,16 +227,16 @@ function closeEditModal() {
   editForm.reset();
 }
 
-// =========================
-// 8. GET TRANSACTIONS
-// =========================
 async function getTransactions() {
+  if (!currentUser) return;
+
   transactionList.innerHTML =
     "<tr><td colspan='5' class='empty-text'>Loading transactions...</td></tr>";
 
   const { data, error } = await supabase
     .from("money_tracker")
     .select("*")
+    .eq("user_id", currentUser.id)
     .order("transaction_date", { ascending: false })
     .order("id", { ascending: false });
 
@@ -154,19 +252,20 @@ async function getTransactions() {
   applyFilters();
 }
 
-// =========================
-// 9. FILTER LOGIC
-// =========================
 function applyFilters() {
   const searchText = searchInput.value.trim().toLowerCase();
   const selectedType = filterType.value;
+  const selectedMonth = filterMonth.value;
 
   const filteredItems = allTransactions.filter((item) => {
-    const matchesSearch = item.title.toLowerCase().includes(searchText);
+    const title = String(item.title || "").toLowerCase();
+    const matchesSearch = title.includes(searchText);
     const matchesType =
       selectedType === "all" ? true : item.type === selectedType;
+    const matchesMonth =
+      !selectedMonth || item.transaction_date?.startsWith(selectedMonth);
 
-    return matchesSearch && matchesType;
+    return matchesSearch && matchesType && matchesMonth;
   });
 
   renderTransactions(filteredItems);
@@ -174,9 +273,6 @@ function applyFilters() {
   updateMonthlySummary(filteredItems);
 }
 
-// =========================
-// 10. RENDER
-// =========================
 function renderTransactions(items) {
   if (!items || items.length === 0) {
     transactionList.innerHTML =
@@ -188,43 +284,48 @@ function renderTransactions(items) {
 
   items.forEach((item) => {
     const row = document.createElement("tr");
+    const titleCell = document.createElement("td");
+    const amountCell = document.createElement("td");
+    const typeCell = document.createElement("td");
+    const dateCell = document.createElement("td");
+    const actionsCell = document.createElement("td");
+    const actionGroup = document.createElement("div");
+    const editButton = document.createElement("button");
+    const deleteButton = document.createElement("button");
 
-    row.innerHTML = `
-      <td>${item.title}</td>
-      <td>$${Number(item.amount).toFixed(2)}</td>
-      <td class="${item.type}">${capitalize(item.type)}</td>
-      <td>${formatDate(item.transaction_date)}</td>
-      <td>
-        <div class="action-group">
-          <button class="icon-btn edit-btn" data-id="${item.id}" title="Edit">
-            <i class="fa-solid fa-pen-to-square"></i>
-          </button>
-          <button class="icon-btn delete-btn" data-id="${item.id}" title="Delete">
-            <i class="fa-solid fa-trash"></i>
-          </button>
-        </div>
-      </td>
-    `;
+    titleCell.textContent = item.title || "-";
+    amountCell.textContent = formatCurrency(item.amount);
+    typeCell.textContent = capitalize(item.type || "");
+    typeCell.className = item.type || "";
+    dateCell.textContent = formatDate(item.transaction_date);
+
+    actionGroup.className = "action-group";
+
+    editButton.className = "icon-btn edit-btn";
+    editButton.dataset.id = item.id;
+    editButton.type = "button";
+    editButton.title = "Edit";
+    editButton.setAttribute("aria-label", `Edit ${item.title || "transaction"}`);
+    editButton.innerHTML = '<i class="fa-solid fa-pen-to-square"></i>';
+
+    deleteButton.className = "icon-btn delete-btn";
+    deleteButton.dataset.id = item.id;
+    deleteButton.type = "button";
+    deleteButton.title = "Delete";
+    deleteButton.setAttribute(
+      "aria-label",
+      `Delete ${item.title || "transaction"}`
+    );
+    deleteButton.innerHTML = '<i class="fa-solid fa-trash"></i>';
+
+    actionGroup.append(editButton, deleteButton);
+    actionsCell.appendChild(actionGroup);
+    row.append(titleCell, amountCell, typeCell, dateCell, actionsCell);
 
     transactionList.appendChild(row);
   });
-
-  document.querySelectorAll(".edit-btn").forEach((button) => {
-    button.addEventListener("click", () => {
-      openPinModal(button.dataset.id);
-    });
-  });
-
-  document.querySelectorAll(".delete-btn").forEach((button) => {
-    button.addEventListener("click", () => {
-      deleteTransaction(button.dataset.id);
-    });
-  });
 }
 
-// =========================
-// 11. HELPERS
-// =========================
 function formatDate(dateString) {
   if (!dateString) return "-";
 
@@ -237,13 +338,81 @@ function formatDate(dateString) {
   });
 }
 
+function formatCurrency(amount) {
+  return currencyFormatter.format(Number(amount) || 0);
+}
+
+function getTodayInputDate() {
+  const parts = new Intl.DateTimeFormat("en-AU", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: "Australia/Melbourne",
+    year: "numeric",
+  }).formatToParts(new Date());
+
+  const day = parts.find((part) => part.type === "day").value;
+  const month = parts.find((part) => part.type === "month").value;
+  const year = parts.find((part) => part.type === "year").value;
+
+  return `${year}-${month}-${day}`;
+}
+
+function getTransactionInput(titleValue, amountValue, typeValue, dateValue) {
+  return {
+    amount: Number(amountValue),
+    title: titleValue.trim(),
+    transaction_date: dateValue,
+    type: typeValue,
+    user_id: currentUser?.id || null,
+  };
+}
+
+function validateTransaction(record) {
+  if (!currentUser) {
+    return "Log in before saving transactions.";
+  }
+
+  if (!record.title || !record.type || !record.transaction_date) {
+    return "Please fill all fields.";
+  }
+
+  if (record.title.length > 80) {
+    return "Title must be 80 characters or less.";
+  }
+
+  if (!Number.isFinite(record.amount) || record.amount <= 0) {
+    return "Amount must be greater than 0.";
+  }
+
+  if (!validTypes.has(record.type)) {
+    return "Please select a valid type.";
+  }
+
+  return "";
+}
+
+function setAuthLoading(isLoading, text = "Working...") {
+  Array.from(authForm.elements).forEach((element) => {
+    element.disabled = isLoading;
+  });
+
+  loginBtn.textContent = isLoading ? text : "Log in";
+  signupBtn.textContent = isLoading ? "Please wait..." : "Sign up";
+}
+
+function setFormLoading(form, button, isLoading, loadingText, defaultText) {
+  Array.from(form.elements).forEach((element) => {
+    element.disabled = isLoading;
+  });
+
+  button.textContent = isLoading ? loadingText : defaultText;
+}
+
 function capitalize(text) {
+  if (!text) return "-";
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-// =========================
-// 12. TOTAL SUMMARY
-// =========================
 function updateSummary(items) {
   let income = 0;
   let expense = 0;
@@ -260,14 +429,11 @@ function updateSummary(items) {
 
   const balance = income - expense;
 
-  incomeTotal.textContent = `$${income.toFixed(2)}`;
-  expenseTotal.textContent = `$${expense.toFixed(2)}`;
-  balanceTotal.textContent = `$${balance.toFixed(2)}`;
+  incomeTotal.textContent = formatCurrency(income);
+  expenseTotal.textContent = formatCurrency(expense);
+  balanceTotal.textContent = formatCurrency(balance);
 }
 
-// =========================
-// 13. MONTHLY SUMMARY
-// =========================
 function updateMonthlySummary(items) {
   const now = new Date();
   const currentMonth = now.getMonth();
@@ -296,148 +462,104 @@ function updateMonthlySummary(items) {
 
   const monthBalance = monthIncome - monthExpense;
 
-  monthIncomeTotal.textContent = `$${monthIncome.toFixed(2)}`;
-  monthExpenseTotal.textContent = `$${monthExpense.toFixed(2)}`;
-  monthBalanceTotal.textContent = `$${monthBalance.toFixed(2)}`;
+  monthIncomeTotal.textContent = formatCurrency(monthIncome);
+  monthExpenseTotal.textContent = formatCurrency(monthExpense);
+  monthBalanceTotal.textContent = formatCurrency(monthBalance);
 }
 
-// =========================
-// 14. ADD TRANSACTION
-// =========================
+authForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+  signIn();
+});
+
+signupBtn.addEventListener("click", signUp);
+logoutBtn.addEventListener("click", signOut);
+
+themeToggleBtn.addEventListener("click", () => {
+  const isDark = document.body.classList.toggle("dark");
+  localStorage.setItem("money-tracker-theme", isDark ? "dark" : "light");
+  updateThemeButton(isDark);
+});
+
 moneyForm.addEventListener("submit", async (e) => {
   e.preventDefault();
 
-  const title = titleInput.value.trim();
-  const amount = amountInput.value.trim();
-  const type = typeInput.value;
-  const transaction_date = dateInput.value;
+  const record = getTransactionInput(
+    titleInput.value,
+    amountInput.value,
+    typeInput.value,
+    dateInput.value
+  );
+  const validationError = validateTransaction(record);
 
-  if (!title || !amount || !type || !transaction_date) {
-    showMessage("Please fill all fields.", true);
+  if (validationError) {
+    showMessage(validationError, true);
     return;
   }
 
-  if (isNaN(Number(amount))) {
-    showMessage("Amount must be a valid number.", true);
-    return;
+  setFormLoading(moneyForm, addSubmitBtn, true, "Adding...", "Add");
+
+  try {
+    const { error } = await supabase.from("money_tracker").insert([record]);
+
+    if (error) {
+      console.error("INSERT ERROR:", error);
+      showMessage(error.message, true);
+      return;
+    }
+
+    showMessage("Transaction added successfully.");
+    moneyForm.reset();
+    dateInput.value = getTodayInputDate();
+    await getTransactions();
+  } finally {
+    setFormLoading(moneyForm, addSubmitBtn, false, "Adding...", "Add");
   }
-
-  const { error } = await supabase.from("money_tracker").insert([
-    {
-      title,
-      amount: Number(amount),
-      type,
-      transaction_date,
-    },
-  ]);
-
-  if (error) {
-    console.error("INSERT ERROR:", error);
-    showMessage(error.message, true);
-    return;
-  }
-
-  showMessage("Transaction added successfully.");
-  moneyForm.reset();
-  dateInput.value = new Date().toISOString().split("T")[0];
-  getTransactions();
 });
 
-// =========================
-// 15. PIN SUBMIT
-// =========================
-pinForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-
-  const enteredPin = pinInput.value.trim();
-
-  if (enteredPin !== editPin) {
-    showMessage("Incorrect PIN. Edit not allowed.", true);
-    pinInput.value = "";
-    pinInput.focus();
-    return;
-  }
-
-  const { data, error } = await supabase
-    .from("money_tracker")
-    .select("*")
-    .eq("id", selectedEditId)
-    .single();
-
-  if (error) {
-    console.error("FETCH RECORD ERROR:", error);
-    showMessage(error.message, true);
-    closePinModal();
-    return;
-  }
-
-  pinModal.classList.add("hidden");
-  openEditModal(data);
-});
-
-// =========================
-// 16. PIN CANCEL
-// =========================
-pinCancelBtn.addEventListener("click", () => {
-  closePinModal();
-});
-
-// =========================
-// 17. UPDATE RECORD
-// =========================
 editForm.addEventListener("submit", async (e) => {
   e.preventDefault();
 
   const id = editId.value;
-  const title = editTitle.value.trim();
-  const amount = editAmount.value.trim();
-  const type = editType.value;
-  const transaction_date = editDate.value;
+  const record = getTransactionInput(
+    editTitle.value,
+    editAmount.value,
+    editType.value,
+    editDate.value
+  );
+  const validationError = validateTransaction(record);
 
-  if (!title || !amount || !type || !transaction_date) {
-    showMessage("Please fill all edit fields.", true);
+  if (validationError) {
+    showMessage(validationError, true);
     return;
   }
 
-  if (isNaN(Number(amount))) {
-    showMessage("Amount must be a valid number.", true);
-    return;
+  setFormLoading(editForm, editSubmitBtn, true, "Updating...", "Update Record");
+
+  try {
+    const { error } = await supabase
+      .from("money_tracker")
+      .update(record)
+      .eq("id", id)
+      .eq("user_id", currentUser.id);
+
+    if (error) {
+      console.error("UPDATE ERROR:", error);
+      showMessage(error.message, true);
+      return;
+    }
+
+    showMessage("Transaction updated successfully.");
+    closeEditModal();
+    await getTransactions();
+  } finally {
+    setFormLoading(editForm, editSubmitBtn, false, "Updating...", "Update Record");
   }
-
-  const { error } = await supabase
-    .from("money_tracker")
-    .update({
-      title,
-      amount: Number(amount),
-      type,
-      transaction_date,
-    })
-    .eq("id", id);
-
-  if (error) {
-    console.error("UPDATE ERROR:", error);
-    showMessage(error.message, true);
-    return;
-  }
-
-  showMessage("Transaction updated successfully.");
-  closeEditModal();
-  selectedEditId = null;
-  getTransactions();
 });
 
-// =========================
-// 18. EDIT CANCEL
-// =========================
-editCancelBtn.addEventListener("click", () => {
-  closeEditModal();
-  selectedEditId = null;
-});
+editCancelBtn.addEventListener("click", closeEditModal);
 
-// =========================
-// 19. DELETE
-// =========================
-async function deleteTransaction(id) {
+async function deleteTransaction(id, button) {
   const confirmDelete = confirm(
     "Are you sure you want to delete this transaction?"
   );
@@ -446,45 +568,68 @@ async function deleteTransaction(id) {
     return;
   }
 
+  button.disabled = true;
+
   const { error } = await supabase
     .from("money_tracker")
     .delete()
-    .eq("id", id);
+    .eq("id", id)
+    .eq("user_id", currentUser.id);
 
   if (error) {
     console.error("DELETE ERROR:", error);
     showMessage(error.message, true);
+    button.disabled = false;
     return;
   }
 
   showMessage("Transaction deleted successfully.");
-  getTransactions();
+  await getTransactions();
 }
 
-// =========================
-// 20. SEARCH + FILTER
-// =========================
 searchInput.addEventListener("input", applyFilters);
 filterType.addEventListener("change", applyFilters);
+filterMonth.addEventListener("change", applyFilters);
+clearFiltersBtn.addEventListener("click", () => {
+  searchInput.value = "";
+  filterType.value = "all";
+  filterMonth.value = "";
+  applyFilters();
+});
 
-// =========================
-// 21. CLOSE MODAL ON BACKDROP
-// =========================
-pinModal.addEventListener("click", (e) => {
-  if (e.target === pinModal) {
-    closePinModal();
+transactionList.addEventListener("click", (e) => {
+  const editButton = e.target.closest(".edit-btn");
+  const deleteButton = e.target.closest(".delete-btn");
+
+  if (editButton) {
+    const record = allTransactions.find(
+      (transaction) => String(transaction.id) === editButton.dataset.id
+    );
+
+    if (record) {
+      openEditModal(record);
+    }
+  }
+
+  if (deleteButton) {
+    deleteTransaction(deleteButton.dataset.id, deleteButton);
   }
 });
 
 editModal.addEventListener("click", (e) => {
   if (e.target === editModal) {
     closeEditModal();
-    selectedEditId = null;
   }
 });
 
-// =========================
-// 22. INIT
-// =========================
+supabase.auth.onAuthStateChange((_event, session) => {
+  currentUser = session?.user || null;
+  updateAuthView();
+
+  if (currentUser) {
+    getTransactions();
+  }
+});
+
 loadTheme();
-getTransactions();
+loadSession();
