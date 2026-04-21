@@ -147,8 +147,18 @@ input::placeholder {
 }
 
 textarea {
-  resize: vertical;
+  resize: none;
   min-height: 48px;
+}
+
+#descriptionInput {
+  min-height: 92px;
+  padding-top: 34px;
+  padding-bottom: 34px;
+}
+
+#editDescription {
+  min-height: 96px;
 }
 
 textarea::placeholder {

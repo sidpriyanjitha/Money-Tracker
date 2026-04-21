@@ -241,6 +241,7 @@ async function getTransactions() {
     .from("money_tracker")
     .select("*")
     .eq("user_id", currentUser.id)
+    .is("deleted_at", null)
     .order("transaction_date", { ascending: false })
     .order("id", { ascending: false });
 
@@ -263,7 +264,10 @@ function applyFilters() {
 
   const filteredItems = allTransactions.filter((item) => {
     const title = String(item.title || "").toLowerCase();
-    const matchesSearch = title.includes(searchText);
+    const description = String(item.description || "").toLowerCase();
+    const matchesSearch =
+      title.includes(searchText) ||
+      description.includes(searchText);
     const matchesType =
       selectedType === "all" ? true : item.type === selectedType;
     const matchesMonth =
@@ -329,17 +333,21 @@ function renderTransactions(items) {
     editButton.setAttribute("aria-label", `Edit ${item.title || "transaction"}`);
     editButton.innerHTML = '<i class="fa-solid fa-pen-to-square"></i>';
 
-    deleteButton.className = "icon-btn delete-btn";
-    deleteButton.dataset.id = item.id;
-    deleteButton.type = "button";
-    deleteButton.title = canDeleteTransactions() ? "Delete" : "Delete restricted";
-    deleteButton.setAttribute(
-      "aria-label",
-      `Delete ${item.title || "transaction"}`
-    );
-    deleteButton.innerHTML = '<i class="fa-solid fa-trash"></i>';
+    if (canDeleteTransactions()) {
+      deleteButton.className = "icon-btn delete-btn";
+      deleteButton.dataset.id = item.id;
+      deleteButton.type = "button";
+      deleteButton.title = "Delete";
+      deleteButton.setAttribute(
+        "aria-label",
+        `Delete ${item.title || "transaction"}`
+      );
+      deleteButton.innerHTML = '<i class="fa-solid fa-trash"></i>';
+      actionGroup.append(editButton, deleteButton);
+    } else {
+      actionGroup.append(editButton);
+    }
 
-    actionGroup.append(editButton, deleteButton);
     actionsCell.appendChild(actionGroup);
     row.append(titleCell, amountCell, typeCell, dateCell, actionsCell);
 
@@ -630,7 +638,7 @@ async function deleteTransaction(id, button) {
 
   const { error } = await supabase
     .from("money_tracker")
-    .delete()
+    .update({ deleted_at: new Date().toISOString() })
     .eq("id", id)
     .eq("user_id", currentUser.id);
 
@@ -641,7 +649,7 @@ async function deleteTransaction(id, button) {
     return;
   }
 
-  showMessage("Transaction deleted successfully.");
+  showMessage("Transaction removed successfully.");
   await getTransactions();
 }
 

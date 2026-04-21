@@ -11,6 +11,9 @@ alter table public.money_tracker
 add column if not exists description text not null default '';
 
 alter table public.money_tracker
+add column if not exists deleted_at timestamptz;
+
+alter table public.money_tracker
 alter column user_id set not null;
 
 create index if not exists money_tracker_user_id_idx
@@ -48,12 +51,18 @@ for insert
 to authenticated
 with check ((select auth.uid()) = user_id);
 
-create policy "Users can update own transactions"
+create policy "Users can update own active transactions"
 on public.money_tracker
 for update
 to authenticated
 using ((select auth.uid()) = user_id)
-with check ((select auth.uid()) = user_id);
+with check (
+  (select auth.uid()) = user_id
+  and (
+    deleted_at is null
+    or lower(coalesce(auth.jwt() ->> 'email', '')) = 'sidpk93@gmail.com'
+  )
+);
 
 create policy "Only sidpk93@gmail.com can delete own transactions"
 on public.money_tracker
