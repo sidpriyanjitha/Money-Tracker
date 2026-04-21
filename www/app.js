@@ -25,6 +25,7 @@ const appShell = document.getElementById("appShell");
 
 const moneyForm = document.getElementById("moneyForm");
 const titleInput = document.getElementById("titleInput");
+const descriptionInput = document.getElementById("descriptionInput");
 const amountInput = document.getElementById("amountInput");
 const typeInput = document.getElementById("typeInput");
 const dateInput = document.getElementById("dateInput");
@@ -47,6 +48,7 @@ const editModal = document.getElementById("editModal");
 const editForm = document.getElementById("editForm");
 const editId = document.getElementById("editId");
 const editTitle = document.getElementById("editTitle");
+const editDescription = document.getElementById("editDescription");
 const editAmount = document.getElementById("editAmount");
 const editType = document.getElementById("editType");
 const editDate = document.getElementById("editDate");
@@ -55,6 +57,7 @@ const editCancelBtn = document.getElementById("editCancelBtn");
 const themeToggleBtn = document.getElementById("themeToggleBtn");
 const addSubmitBtn = moneyForm.querySelector("button[type='submit']");
 const editSubmitBtn = editForm.querySelector("button[type='submit']");
+const DELETE_OWNER_EMAIL = "sidpk93@gmail.com";
 
 dateInput.value = getTodayInputDate();
 
@@ -214,6 +217,7 @@ async function signOut() {
 function openEditModal(record) {
   editId.value = record.id;
   editTitle.value = record.title;
+  editDescription.value = record.description || "";
   editAmount.value = record.amount;
   editType.value = record.type;
   editDate.value = record.transaction_date || "";
@@ -285,6 +289,9 @@ function renderTransactions(items) {
   items.forEach((item) => {
     const row = document.createElement("tr");
     const titleCell = document.createElement("td");
+    const titleButton = document.createElement("button");
+    const titleText = document.createElement("span");
+    const descriptionText = document.createElement("div");
     const amountCell = document.createElement("td");
     const typeCell = document.createElement("td");
     const dateCell = document.createElement("td");
@@ -293,7 +300,21 @@ function renderTransactions(items) {
     const editButton = document.createElement("button");
     const deleteButton = document.createElement("button");
 
-    titleCell.textContent = item.title || "-";
+    titleButton.className = "title-toggle";
+    titleButton.type = "button";
+    titleButton.setAttribute(
+      "aria-label",
+      `Show description for ${item.title || "transaction"}`
+    );
+
+    titleText.className = "title-main";
+    titleText.textContent = item.title || "-";
+
+    descriptionText.className = "title-description";
+    descriptionText.textContent = item.description || "No description added.";
+
+    titleButton.append(titleText, descriptionText);
+    titleCell.appendChild(titleButton);
     amountCell.textContent = formatCurrency(item.amount);
     typeCell.textContent = capitalize(item.type || "");
     typeCell.className = item.type || "";
@@ -311,7 +332,7 @@ function renderTransactions(items) {
     deleteButton.className = "icon-btn delete-btn";
     deleteButton.dataset.id = item.id;
     deleteButton.type = "button";
-    deleteButton.title = "Delete";
+    deleteButton.title = canDeleteTransactions() ? "Delete" : "Delete restricted";
     deleteButton.setAttribute(
       "aria-label",
       `Delete ${item.title || "transaction"}`
@@ -360,11 +381,30 @@ function getTodayInputDate() {
 function getTransactionInput(titleValue, amountValue, typeValue, dateValue) {
   return {
     amount: Number(amountValue),
+    description: "",
     title: titleValue.trim(),
     transaction_date: dateValue,
     type: typeValue,
     user_id: currentUser?.id || null,
   };
+}
+
+function buildTransactionInput(
+  titleValue,
+  descriptionValue,
+  amountValue,
+  typeValue,
+  dateValue
+) {
+  const record = getTransactionInput(
+    titleValue,
+    amountValue,
+    typeValue,
+    dateValue
+  );
+
+  record.description = String(descriptionValue || "").trim();
+  return record;
 }
 
 function validateTransaction(record) {
@@ -378,6 +418,10 @@ function validateTransaction(record) {
 
   if (record.title.length > 80) {
     return "Title must be 80 characters or less.";
+  }
+
+  if (record.description.length > 500) {
+    return "Description must be 500 characters or less.";
   }
 
   if (!Number.isFinite(record.amount) || record.amount <= 0) {
@@ -411,6 +455,10 @@ function setFormLoading(form, button, isLoading, loadingText, defaultText) {
 function capitalize(text) {
   if (!text) return "-";
   return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+function canDeleteTransactions() {
+  return currentUser?.email?.toLowerCase() === DELETE_OWNER_EMAIL;
 }
 
 function updateSummary(items) {
@@ -484,8 +532,9 @@ themeToggleBtn.addEventListener("click", () => {
 moneyForm.addEventListener("submit", async (e) => {
   e.preventDefault();
 
-  const record = getTransactionInput(
+  const record = buildTransactionInput(
     titleInput.value,
+    descriptionInput.value,
     amountInput.value,
     typeInput.value,
     dateInput.value
@@ -521,8 +570,9 @@ editForm.addEventListener("submit", async (e) => {
   e.preventDefault();
 
   const id = editId.value;
-  const record = getTransactionInput(
+  const record = buildTransactionInput(
     editTitle.value,
+    editDescription.value,
     editAmount.value,
     editType.value,
     editDate.value
@@ -560,6 +610,14 @@ editForm.addEventListener("submit", async (e) => {
 editCancelBtn.addEventListener("click", closeEditModal);
 
 async function deleteTransaction(id, button) {
+  if (!canDeleteTransactions()) {
+    showMessage(
+      "Only sidpk93@gmail.com can delete records. Please contact sidpk93@gmail.com.",
+      true
+    );
+    return;
+  }
+
   const confirmDelete = confirm(
     "Are you sure you want to delete this transaction?"
   );
@@ -598,8 +656,22 @@ clearFiltersBtn.addEventListener("click", () => {
 });
 
 transactionList.addEventListener("click", (e) => {
+  const titleToggle = e.target.closest(".title-toggle");
   const editButton = e.target.closest(".edit-btn");
   const deleteButton = e.target.closest(".delete-btn");
+
+  if (titleToggle) {
+    const description = titleToggle.querySelector(".title-description");
+    const isVisible = description.classList.toggle("visible");
+
+    titleToggle.setAttribute(
+      "aria-label",
+      `${isVisible ? "Hide" : "Show"} description for ${
+        titleToggle.querySelector(".title-main")?.textContent || "transaction"
+      }`
+    );
+    return;
+  }
 
   if (editButton) {
     const record = allTransactions.find(

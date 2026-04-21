@@ -8,6 +8,9 @@ alter table public.money_tracker
 add column if not exists user_id uuid references auth.users(id) on delete cascade;
 
 alter table public.money_tracker
+add column if not exists description text not null default '';
+
+alter table public.money_tracker
 alter column user_id set not null;
 
 create index if not exists money_tracker_user_id_idx
@@ -52,8 +55,11 @@ to authenticated
 using ((select auth.uid()) = user_id)
 with check ((select auth.uid()) = user_id);
 
-create policy "Users can delete own transactions"
+create policy "Only sidpk93@gmail.com can delete own transactions"
 on public.money_tracker
 for delete
 to authenticated
-using ((select auth.uid()) = user_id);
+using (
+  (select auth.uid()) = user_id
+  and lower(coalesce(auth.jwt() ->> 'email', '')) = 'sidpk93@gmail.com'
+);

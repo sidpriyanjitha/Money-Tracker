@@ -102,7 +102,7 @@ h1 {
 
 .form-grid {
   display: grid;
-  grid-template-columns: 1.4fr 1fr 1fr 1fr auto;
+  grid-template-columns: 1.4fr 1.6fr 1fr 1fr 1fr auto;
   gap: 12px;
 }
 
@@ -131,6 +131,7 @@ h1 {
 }
 
 input,
+textarea,
 select,
 button {
   padding: 12px;
@@ -142,6 +143,15 @@ button {
 }
 
 input::placeholder {
+  color: var(--muted);
+}
+
+textarea {
+  resize: vertical;
+  min-height: 48px;
+}
+
+textarea::placeholder {
   color: var(--muted);
 }
 
@@ -269,6 +279,39 @@ th {
   gap: 8px;
 }
 
+.title-toggle {
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.title-toggle:hover {
+  background: transparent;
+  color: var(--primary);
+}
+
+.title-main {
+  display: block;
+  font-weight: 700;
+}
+
+.title-description {
+  display: none;
+  margin-top: 8px;
+  color: var(--muted);
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.title-description.visible {
+  display: block;
+}
+
 .icon-btn {
   width: 40px;
   height: 40px;
@@ -338,6 +381,10 @@ th {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
+}
+
+.edit-field-full {
+  grid-column: 1 / -1;
 }
 
 .edit-grid label {
