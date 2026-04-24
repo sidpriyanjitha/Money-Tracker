@@ -102,7 +102,7 @@ h1 {
 
 .form-grid {
   display: grid;
-  grid-template-columns: 1.4fr 1.6fr 1fr 1fr 1fr auto;
+  grid-template-columns: 1fr 1fr 1fr 1fr 1fr auto;
   gap: 12px;
 }
 
@@ -152,9 +152,8 @@ textarea {
 }
 
 #descriptionInput {
-  min-height: 92px;
-  padding-top: 34px;
-  padding-bottom: 34px;
+  min-height: 30px;
+  
 }
 
 #editDescription {
