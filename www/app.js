@@ -240,7 +240,6 @@ async function getTransactions() {
   const { data, error } = await supabase
     .from("money_tracker")
     .select("*")
-    .eq("user_id", currentUser.id)
     .is("deleted_at", null)
     .order("transaction_date", { ascending: false })
     .order("id", { ascending: false });
@@ -326,27 +325,30 @@ function renderTransactions(items) {
 
     actionGroup.className = "action-group";
 
+    const isAdmin = canDeleteTransactions();
+
     editButton.className = "icon-btn edit-btn";
     editButton.dataset.id = item.id;
     editButton.type = "button";
     editButton.title = "Edit";
     editButton.setAttribute("aria-label", `Edit ${item.title || "transaction"}`);
     editButton.innerHTML = '<i class="fa-solid fa-pen-to-square"></i>';
+    editButton.setAttribute("aria-disabled", String(!isAdmin));
+    editButton.classList.toggle("is-disabled", !isAdmin);
 
-    if (canDeleteTransactions()) {
-      deleteButton.className = "icon-btn delete-btn";
-      deleteButton.dataset.id = item.id;
-      deleteButton.type = "button";
-      deleteButton.title = "Delete";
-      deleteButton.setAttribute(
-        "aria-label",
-        `Delete ${item.title || "transaction"}`
-      );
-      deleteButton.innerHTML = '<i class="fa-solid fa-trash"></i>';
-      actionGroup.append(editButton, deleteButton);
-    } else {
-      actionGroup.append(editButton);
-    }
+    deleteButton.className = "icon-btn delete-btn";
+    deleteButton.dataset.id = item.id;
+    deleteButton.type = "button";
+    deleteButton.title = "Delete";
+    deleteButton.setAttribute(
+      "aria-label",
+      `Delete ${item.title || "transaction"}`
+    );
+    deleteButton.innerHTML = '<i class="fa-solid fa-trash"></i>';
+    deleteButton.setAttribute("aria-disabled", String(!isAdmin));
+    deleteButton.classList.toggle("is-disabled", !isAdmin);
+
+    actionGroup.append(editButton, deleteButton);
 
     actionsCell.appendChild(actionGroup);
     row.append(titleCell, amountCell, typeCell, dateCell, actionsCell);
@@ -467,6 +469,13 @@ function capitalize(text) {
 
 function canDeleteTransactions() {
   return currentUser?.email?.toLowerCase() === DELETE_OWNER_EMAIL;
+}
+
+function showAdminOnlyWarning(action) {
+  showMessage(
+    `Only Sidaththa Priyanjitha can ${action} records. Please contact ${DELETE_OWNER_EMAIL}.`,
+    true
+  );
 }
 
 function updateSummary(items) {
@@ -607,7 +616,10 @@ editForm.addEventListener("submit", async (e) => {
 
     if (error) {
       console.error("UPDATE ERROR:", error);
-      showMessage(error.message, true);
+      showMessage(
+        error.message || "You can only edit your own records unless you are the admin.",
+        true
+      );
       return;
     }
 
@@ -623,10 +635,7 @@ editCancelBtn.addEventListener("click", closeEditModal);
 
 async function deleteTransaction(id, button) {
   if (!canDeleteTransactions()) {
-    showMessage(
-      "Only sidpk93@gmail.com can delete records. Please contact sidpk93@gmail.com.",
-      true
-    );
+    showAdminOnlyWarning("delete");
     return;
   }
 
@@ -643,8 +652,7 @@ async function deleteTransaction(id, button) {
   const { error } = await supabase
     .from("money_tracker")
     .update({ deleted_at: new Date().toISOString() })
-    .eq("id", id)
-    .eq("user_id", currentUser.id);
+    .eq("id", id);
 
   if (error) {
     console.error("DELETE ERROR:", error);
@@ -686,6 +694,11 @@ transactionList.addEventListener("click", (e) => {
   }
 
   if (editButton) {
+    if (!canDeleteTransactions()) {
+      showAdminOnlyWarning("edit");
+      return;
+    }
+
     const record = allTransactions.find(
       (transaction) => String(transaction.id) === editButton.dataset.id
     );
@@ -697,6 +710,7 @@ transactionList.addEventListener("click", (e) => {
 
   if (deleteButton) {
     deleteTransaction(deleteButton.dataset.id, deleteButton);
+    return;
   }
 });
 

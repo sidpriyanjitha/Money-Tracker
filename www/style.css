@@ -331,6 +331,15 @@ th {
   border-radius: 10px;
 }
 
+.icon-btn.is-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.icon-btn.is-disabled:hover {
+  filter: none;
+}
+
 .edit-btn {
   background: var(--warning);
 }

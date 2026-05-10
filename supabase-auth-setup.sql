@@ -1,8 +1,7 @@
 -- Run this in Supabase SQL Editor.
--- This starts fresh by deleting existing money_tracker rows, then locks the
--- table so each signed-in user can only access their own transactions.
-
-delete from public.money_tracker;
+-- This keeps existing money_tracker rows and configures access so every
+-- signed-in user can view all active transactions, while only
+-- sidpk93@gmail.com has admin delete rights.
 
 alter table public.money_tracker
 add column if not exists user_id uuid references auth.users(id) on delete cascade;
@@ -39,11 +38,11 @@ begin
   end loop;
 end $$;
 
-create policy "Users can read own transactions"
+create policy "Authenticated users can read all transactions"
 on public.money_tracker
 for select
 to authenticated
-using ((select auth.uid()) = user_id);
+using (deleted_at is null);
 
 create policy "Users can create own transactions"
 on public.money_tracker
@@ -55,20 +54,22 @@ create policy "Users can update own active transactions"
 on public.money_tracker
 for update
 to authenticated
-using ((select auth.uid()) = user_id)
+using (
+  ((select auth.uid()) = user_id and deleted_at is null)
+  or lower(coalesce(auth.jwt() ->> 'email', '')) = 'sidpk93@gmail.com'
+)
 with check (
-  (select auth.uid()) = user_id
-  and (
-    deleted_at is null
-    or lower(coalesce(auth.jwt() ->> 'email', '')) = 'sidpk93@gmail.com'
+  (
+    (select auth.uid()) = user_id
+    and deleted_at is null
   )
+  or lower(coalesce(auth.jwt() ->> 'email', '')) = 'sidpk93@gmail.com'
 );
 
-create policy "Only sidpk93@gmail.com can delete own transactions"
+create policy "Only sidpk93@gmail.com can delete transactions"
 on public.money_tracker
 for delete
 to authenticated
 using (
-  (select auth.uid()) = user_id
-  and lower(coalesce(auth.jwt() ->> 'email', '')) = 'sidpk93@gmail.com'
+  lower(coalesce(auth.jwt() ->> 'email', '')) = 'sidpk93@gmail.com'
 );
