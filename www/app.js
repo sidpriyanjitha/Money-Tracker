@@ -491,6 +491,10 @@ function updateSummary(items) {
 }
 
 function updateMonthlySummary(items) {
+  if (!monthIncomeTotal || !monthExpenseTotal || !monthBalanceTotal) {
+    return;
+  }
+
   const now = new Date();
   const currentMonth = now.getMonth();
   const currentYear = now.getFullYear();
@@ -542,7 +546,7 @@ moneyForm.addEventListener("submit", async (e) => {
 
   const record = buildTransactionInput(
     titleInput.value,
-    descriptionInput.value,
+    descriptionInput?.value,
     amountInput.value,
     typeInput.value,
     dateInput.value
