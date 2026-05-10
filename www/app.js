@@ -31,6 +31,8 @@ const typeInput = document.getElementById("typeInput");
 const dateInput = document.getElementById("dateInput");
 const transactionList = document.getElementById("transactionList");
 const message = document.getElementById("message");
+const pullIndicator = document.getElementById("pullIndicator");
+const pullIndicatorText = document.getElementById("pullIndicatorText");
 
 const incomeTotal = document.getElementById("incomeTotal");
 const expenseTotal = document.getElementById("expenseTotal");
@@ -58,12 +60,19 @@ const themeToggleBtn = document.getElementById("themeToggleBtn");
 const addSubmitBtn = moneyForm.querySelector("button[type='submit']");
 const editSubmitBtn = editForm.querySelector("button[type='submit']");
 const DELETE_OWNER_EMAIL = "sidpk93@gmail.com";
+const PULL_REFRESH_THRESHOLD = 84;
+const MAX_PULL_DISTANCE = 132;
 
 dateInput.value = getTodayInputDate();
 
+let pullStartY = 0;
+let pullDistance = 0;
+let isPullingToRefresh = false;
+let isRefreshingFromPull = false;
+
 function showMessage(text, isError = false) {
   message.textContent = text;
-  message.className = `message ${isError ? "error" : "success"}`;
+  message.className = `message is-visible ${isError ? "error" : "success"}`;
 
   setTimeout(() => {
     message.textContent = "";
@@ -478,6 +487,88 @@ function showAdminOnlyWarning(action) {
   );
 }
 
+function isMobileViewport() {
+  return window.innerWidth <= 850;
+}
+
+function getScrollTop() {
+  return window.scrollY || document.documentElement.scrollTop || 0;
+}
+
+function shouldAllowPullToRefresh(target) {
+  const startTarget =
+    target instanceof Element ? target : target?.parentElement || null;
+
+  if (
+    !currentUser ||
+    !isMobileViewport() ||
+    isRefreshingFromPull ||
+    !editModal.classList.contains("hidden")
+  ) {
+    return false;
+  }
+
+  if (getScrollTop() > 0) {
+    return false;
+  }
+
+  if (!startTarget) {
+    return true;
+  }
+
+  const blockedTarget = startTarget.closest(
+    "textarea, select, button, a, .modal-box"
+  );
+
+  return !blockedTarget;
+}
+
+function updatePullIndicator(distance) {
+  const clampedDistance = Math.min(distance, MAX_PULL_DISTANCE);
+  const isReady = clampedDistance >= PULL_REFRESH_THRESHOLD;
+
+  document.body.classList.add("is-pulling");
+  document.body.style.setProperty("--pull-offset", `${clampedDistance}px`);
+  pullIndicator.classList.add("is-visible");
+  pullIndicator.classList.toggle("is-ready", isReady);
+  pullIndicator.classList.remove("is-refreshing");
+  pullIndicatorText.textContent = isReady
+    ? "Release to refresh"
+    : "Pull down to refresh";
+}
+
+function resetPullToRefresh() {
+  isPullingToRefresh = false;
+  pullDistance = 0;
+  document.body.classList.remove("is-pulling");
+  document.body.style.setProperty("--pull-offset", "0px");
+  pullIndicator.classList.remove("is-visible", "is-ready", "is-refreshing");
+  pullIndicatorText.textContent = "Pull down to refresh";
+}
+
+async function refreshTransactionsFromPull() {
+  if (!currentUser || isRefreshingFromPull) {
+    resetPullToRefresh();
+    return;
+  }
+
+  isRefreshingFromPull = true;
+  document.body.classList.remove("is-pulling");
+  document.body.style.setProperty("--pull-offset", "60px");
+  pullIndicator.classList.add("is-visible", "is-refreshing");
+  pullIndicator.classList.remove("is-ready");
+  pullIndicatorText.textContent = "Refreshing records...";
+
+  try {
+    await getTransactions();
+  } finally {
+    setTimeout(() => {
+      isRefreshingFromPull = false;
+      resetPullToRefresh();
+    }, 280);
+  }
+}
+
 function updateSummary(items) {
   let income = 0;
   let expense = 0;
@@ -651,7 +742,7 @@ async function deleteTransaction(id, button) {
 
   const { error } = await supabase
     .from("money_tracker")
-    .update({ deleted_at: new Date().toISOString() })
+    .delete()
     .eq("id", id);
 
   if (error) {
@@ -711,6 +802,61 @@ transactionList.addEventListener("click", (e) => {
   if (deleteButton) {
     deleteTransaction(deleteButton.dataset.id, deleteButton);
     return;
+  }
+});
+
+document.addEventListener(
+  "touchstart",
+  (e) => {
+    if (!shouldAllowPullToRefresh(e.target)) {
+      return;
+    }
+
+    pullStartY = e.touches[0].clientY;
+    pullDistance = 0;
+    isPullingToRefresh = true;
+  },
+  { passive: true }
+);
+
+document.addEventListener(
+  "touchmove",
+  (e) => {
+    if (!isPullingToRefresh || isRefreshingFromPull) {
+      return;
+    }
+
+    const currentY = e.touches[0].clientY;
+    const deltaY = currentY - pullStartY;
+
+    if (deltaY <= 0) {
+      resetPullToRefresh();
+      return;
+    }
+
+    pullDistance = deltaY * 0.45;
+    updatePullIndicator(pullDistance);
+    e.preventDefault();
+  },
+  { passive: false }
+);
+
+document.addEventListener("touchend", () => {
+  if (!isPullingToRefresh || isRefreshingFromPull) {
+    return;
+  }
+
+  if (pullDistance >= PULL_REFRESH_THRESHOLD) {
+    refreshTransactionsFromPull();
+    return;
+  }
+
+  resetPullToRefresh();
+});
+
+document.addEventListener("touchcancel", () => {
+  if (!isRefreshingFromPull) {
+    resetPullToRefresh();
   }
 });
 

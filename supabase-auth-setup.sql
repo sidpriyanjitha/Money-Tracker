@@ -21,6 +21,24 @@ on public.money_tracker(user_id);
 alter table public.money_tracker
 enable row level security;
 
+create or replace function public.is_money_tracker_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, auth
+as $$
+  select exists (
+    select 1
+    from auth.users
+    where id = auth.uid()
+      and lower(email) = 'sidpk93@gmail.com'
+  );
+$$;
+
+revoke all on function public.is_money_tracker_admin() from public;
+grant execute on function public.is_money_tracker_admin() to authenticated;
+
 do $$
 declare
   existing_policy record;
@@ -56,14 +74,14 @@ for update
 to authenticated
 using (
   ((select auth.uid()) = user_id and deleted_at is null)
-  or lower(coalesce(auth.jwt() ->> 'email', '')) = 'sidpk93@gmail.com'
+  or public.is_money_tracker_admin()
 )
 with check (
   (
     (select auth.uid()) = user_id
     and deleted_at is null
   )
-  or lower(coalesce(auth.jwt() ->> 'email', '')) = 'sidpk93@gmail.com'
+  or public.is_money_tracker_admin()
 );
 
 create policy "Only sidpk93@gmail.com can delete transactions"
@@ -71,5 +89,5 @@ on public.money_tracker
 for delete
 to authenticated
 using (
-  lower(coalesce(auth.jwt() ->> 'email', '')) = 'sidpk93@gmail.com'
+  public.is_money_tracker_admin()
 );
