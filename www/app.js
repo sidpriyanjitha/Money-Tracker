@@ -4,7 +4,7 @@ const supabaseUrl = "https://tabgupjtduxyyrjundhj.supabase.co";
 const supabaseKey = "sb_publishable_8oP7ThVKyztLiZ_tviGpoQ_mdHn8Bvk";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-const validTypes = new Set(["income", "expense"]);
+const validTypes = new Set(["income", "expense", "adjustment"]);
 const currencyFormatter = new Intl.NumberFormat("en-AU", {
   style: "currency",
   currency: "AUD",
@@ -473,6 +473,8 @@ function setFormLoading(form, button, isLoading, loadingText, defaultText) {
 
 function capitalize(text) {
   if (!text) return "-";
+  if (text === "adjustment") return "Adjustment / Refund";
+
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
@@ -572,18 +574,21 @@ async function refreshTransactionsFromPull() {
 function updateSummary(items) {
   let income = 0;
   let expense = 0;
+  let adjustment = 0;
 
   items.forEach((item) => {
     const amount = Number(item.amount);
 
     if (item.type === "income") {
       income += amount;
-    } else {
+    } else if (item.type === "expense") {
       expense += amount;
+    } else if (item.type === "adjustment") {
+      adjustment += amount;
     }
   });
 
-  const balance = income - expense;
+  const balance = income - expense + adjustment;
 
   incomeTotal.textContent = formatCurrency(income);
   expenseTotal.textContent = formatCurrency(expense);
@@ -601,6 +606,7 @@ function updateMonthlySummary(items) {
 
   let monthIncome = 0;
   let monthExpense = 0;
+  let monthAdjustment = 0;
 
   items.forEach((item) => {
     if (!item.transaction_date) return;
@@ -614,13 +620,15 @@ function updateMonthlySummary(items) {
 
       if (item.type === "income") {
         monthIncome += amount;
-      } else {
+      } else if (item.type === "expense") {
         monthExpense += amount;
+      } else if (item.type === "adjustment") {
+        monthAdjustment += amount;
       }
     }
   });
 
-  const monthBalance = monthIncome - monthExpense;
+  const monthBalance = monthIncome - monthExpense + monthAdjustment;
 
   monthIncomeTotal.textContent = formatCurrency(monthIncome);
   monthExpenseTotal.textContent = formatCurrency(monthExpense);

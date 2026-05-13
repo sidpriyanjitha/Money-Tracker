@@ -13,6 +13,13 @@ alter table public.money_tracker
 add column if not exists deleted_at timestamptz;
 
 alter table public.money_tracker
+drop constraint if exists money_tracker_type_check;
+
+alter table public.money_tracker
+add constraint money_tracker_type_check
+check (type in ('income', 'expense', 'adjustment'));
+
+alter table public.money_tracker
 alter column user_id set not null;
 
 create index if not exists money_tracker_user_id_idx

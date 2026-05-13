@@ -16,6 +16,7 @@
   --danger-hover: #b91c1c;
   --income: #0f9d58;
   --expense: #d93025;
+  --adjustment: #7c3aed;
   --balance: #2563eb;
   --modal-backdrop: rgba(0, 0, 0, 0.45);
   --success: #0f9d58;
@@ -41,6 +42,7 @@ body.dark {
   --danger-hover: #dc2626;
   --income: #22c55e;
   --expense: #f87171;
+  --adjustment: #a78bfa;
   --balance: #60a5fa;
   --modal-backdrop: rgba(0, 0, 0, 0.6);
   --success: #22c55e;
@@ -246,6 +248,10 @@ button:disabled {
 
 .expense {
   color: var(--expense);
+}
+
+.adjustment {
+  color: var(--adjustment);
 }
 
 .balance {
