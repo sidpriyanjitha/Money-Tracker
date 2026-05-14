@@ -158,7 +158,7 @@ input::placeholder {
 
 textarea {
   resize: none;
-  min-height: 48px;
+  min-height: 50px;
 }
 
 #descriptionInput {
